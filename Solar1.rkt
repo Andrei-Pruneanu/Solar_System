@@ -1,6 +1,6 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname Solar) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname Solar1) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 ; Solar System Simulator
 
 (require 2htdp/image)
@@ -85,7 +85,7 @@
 (define JUPITER (make-celestial-body "Jupiter" 16 (* 5 ORBIT-STEP) "sienna" 4 (* 0.084 SPEED-SCALE)))
 (define SATURN (make-celestial-body "Saturn" 14 (* 6 ORBIT-STEP) "gold" 5 (* 0.034 SPEED-SCALE)))
 (define URANUS (make-celestial-body "Uranus" 12 (* 7 ORBIT-STEP) "lightblue" 6 (* 0.012 SPEED-SCALE)))
-(define NEPTUN (make-celestial-body "Neptun" 11 (* 8 ORBIT-STEP) "navy" 0.5 (* 0.006 SPEED-SCALE)))
+(define NEPTUNE (make-celestial-body "Neptune" 11 (* 8 ORBIT-STEP) "navy" 0.5 (* 0.006 SPEED-SCALE)))
 
 ; size of overall scene
 (define SCENE-WIDTH 1496)  
@@ -96,7 +96,7 @@
 
 ; list of planets
 (define INITIAL-SOLAR-SYSTEM
-  (list SUN MERCURY VENUS EARTH MARS JUPITER SATURN URANUS NEPTUN))
+  (list SUN MERCURY VENUS EARTH MARS JUPITER SATURN URANUS NEPTUNE))
 
 ; initial state including zoom
 (define INITIAL-STATE (make-sim-state INITIAL-SOLAR-SYSTEM 1)) 
@@ -182,23 +182,23 @@
 
                     (define planet-base-image
                       (cond
-                        [(string=? (celestial-body-name body) "Sun")    SUN-FINAL-IMAGE]   
-            [(string=? (celestial-body-name body) "Earth")  EARTH-FINAL-IMAGE] 
-            [(string=? (celestial-body-name body) "Mercury") MERCURY-FINAL-IMAGE]
-            [(string=? (celestial-body-name body) "Venus")  VENUS-FINAL-IMAGE]
-            [(string=? (celestial-body-name body) "Mars")   MARS-FINAL-IMAGE]
-            [(string=? (celestial-body-name body) "Jupiter") JUPITER-FINAL-IMAGE]
-            [(string=? (celestial-body-name body) "Saturn") SATURN-FINAL-IMAGE]
-            [(string=? (celestial-body-name body) "Uranus") URANUS-FINAL-IMAGE]
-            [(string=? (celestial-body-name body) "Neptune") NEPTUNE-FINAL-IMAGE]
-            [else (circle (celestial-body-radius body) "solid" (celestial-body-color body))]))
+                        [(string=? (celestial-body-name body) "Sun")    SUN-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Earth")  EARTH-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Mercury") MERCURY-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Venus")  VENUS-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Mars")   MARS-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Jupiter") JUPITER-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Saturn") SATURN-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Uranus") URANUS-FINAL-IMAGE]
+                        [(string=? (celestial-body-name body) "Neptune") NEPTUNE-FINAL-IMAGE]
+                        [else (circle (celestial-body-radius body) "solid" (celestial-body-color body))]))
 
                     (define final-planet-image (scale zoom planet-base-image))
                     ; Scale coordinates by zoom
                     (define x (+ CENTER-X (* (location-x loc) zoom)))
-                    (define y (+ CENTER-Y (* (location-y loc) zoom)))] 
-              (place-image
-               final-planet-image               ; create the planet’s circle image
+                    (define y (+ CENTER-Y (* (location-y loc) zoom)))]
+
+              (place-image final-planet-image
                x y
                scene-with-orbit)))
 
