@@ -8,21 +8,28 @@ Group Members: Bolcau Leonardo Gabriel and Pruneanu Andrei
 
 1. Implemented Features:
 The current state of the project includes:
-- 
-- 
--
+
+- Celestial Body Structure: defined structs for Sun and 8 planets (radius, orbit, color, speed)
+
+- Orbital Mechanics: implemented the math to calculate (x, y) coordinates based on polar coordinates (angle and radius), allowing planets to orbit at different speeds relative to the Sun
+
+- Added bitmap images for planets and visual orbit paths (rings) for scale
+
+- Interactive Zoom
 
 ---------------------------
 
 2. Project Changes & Design Decisions:
 During the development, we made a few adjustments to the initial idea:
 
-- Addition of Zoom Functionality: we realized that the distance between Mercury and Neptune is too large to fit on a single screen without making the inner planets invisible.
+- Addition of Zoom Functionality: we realized that the distance between Mercury and Neptune is too large to fit on a single screen without making the inner planets invisible
 
-- Use of Image Assets: to make the simulation more engaging than just moving colored dots.
+- Use of Image Assets: to make the simulation more engaging than just moving colored dots
 
 ---------------------------
 
 3. Next Steps:
 - We discussed the possibility of adding interactive buttons to increase or decrease the speed of the planets
+
+- Add information labels (text) when hovering over planets
 
