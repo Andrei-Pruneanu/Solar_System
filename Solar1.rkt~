@@ -287,18 +287,18 @@
                x y
                scene-with-highlight)))
 
-          ; draw-all-bodies: List<CelestialBody> Image -> Image
-          ; draw each body onto the scene and return the final image
-          ; header: (define (draw-all-bodies bodies-remaining current-scene) Image)
-          ; template:
-
-          (define (draw-all-bodies bodies-remaining current-scene)
-            (cond
-              [(empty? bodies-remaining) current-scene]                ; Base case
-              [else
-               (draw-all-bodies (rest bodies-remaining)                ; Recursive case
-               (draw-body (first bodies-remaining) current-scene))]))
-          ]
+    ; draw-all-bodies: List<CelestialBody> Image -> Image
+    ; draw each body onto the scene and return the final image
+    ; header: (define (draw-all-bodies bodies-remaining current-scene) Image)
+    ; template:
+          
+    (define (draw-all-bodies bodies-remaining current-scene)
+      (cond
+        [(empty? bodies-remaining) current-scene]                ; Base case
+        [else 
+         (draw-all-bodies (rest bodies-remaining)                ; Recursive case
+          (draw-body (first bodies-remaining) current-scene))]))
+    ]
     
     ; Draw Info Text
     (place-image (text (string-append "Camera Locked: " locked-name) 16 "white") 
