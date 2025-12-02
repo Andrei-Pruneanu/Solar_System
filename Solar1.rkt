@@ -8,39 +8,39 @@
 
 ;; --- IMAGE LOADING SECTION ---
 
-;; 1. Load Earth
+; 1. Load Earth
 (define EARTH-RAW-IMAGE (bitmap/file "./img/earth.png"))
 (define EARTH-FINAL-IMAGE (scale 0.03 EARTH-RAW-IMAGE)) 
 
-;; 2. Load Sun
+; 2. Load Sun
 (define SUN-RAW-IMAGE (bitmap/file "./img/sun.png"))
 (define SUN-FINAL-IMAGE (scale 0.2 SUN-RAW-IMAGE))    
 
-;; 3. Load Mercury
+; 3. Load Mercury
 (define MERCURY-RAW-IMAGE (bitmap/file "./img/mercury.png"))
 (define MERCURY-FINAL-IMAGE (scale 0.02 MERCURY-RAW-IMAGE)) 
 
-;; 4. Load Venus
+; 4. Load Venus
 (define VENUS-RAW-IMAGE (bitmap/file "./img/venus.png"))
 (define VENUS-FINAL-IMAGE (scale 0.02 VENUS-RAW-IMAGE))
 
-;; 5. Load Mars
+; 5. Load Mars
 (define MARS-RAW-IMAGE (bitmap/file "./img/mars.png"))
 (define MARS-FINAL-IMAGE (scale 0.02 MARS-RAW-IMAGE))
 
-;; 6. Load Jupiter
+; 6. Load Jupiter
 (define JUPITER-RAW-IMAGE (bitmap/file "./img/jupiter.png"))
-(define JUPITER-FINAL-IMAGE (scale 0.08 JUPITER-RAW-IMAGE))
+(define JUPITER-FINAL-IMAGE (scale 0.043 JUPITER-RAW-IMAGE))
 
-;; 7. Load Saturn
+; 7. Load Saturn
 (define SATURN-RAW-IMAGE (bitmap/file "./img/saturn.png"))
 (define SATURN-FINAL-IMAGE (scale 0.08 SATURN-RAW-IMAGE))
 
-;; 8. Load Uranus
+; 8. Load Uranus
 (define URANUS-RAW-IMAGE (bitmap/file "./img/uranus.png"))
 (define URANUS-FINAL-IMAGE (scale 0.015 URANUS-RAW-IMAGE)) 
 
-;; 9. Load Neptune
+; 9. Load Neptune
 (define NEPTUNE-RAW-IMAGE (bitmap/file "./img/neptune.png"))
 (define NEPTUNE-FINAL-IMAGE (scale 0.015 NEPTUNE-RAW-IMAGE))
 
@@ -64,14 +64,15 @@
 ; - angular-speed : change in angle (radians) per clock tick
 (define-struct celestial-body (name radius orbit-au color angle angular-speed))
 
-; A SimState is a structure: (define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name])
-;                            make-sim-state : List<CelestialBody> Number Number Number String -> SimState
+; A SimState is a structure: (define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index])
+;                            make-sim-state : List<CelestialBody> Number Number Number String Number -> SimState
 ; interpretation:
 ; - bodies           : List of celestial bodies
 ; - zoom             : Number (e.g. 1.0 is normal, 2.0 is 2x zoom)
 ; - mouse-x, mouse-y : Coordinates of the mouse (for hover effect)
 ; - locked-body-name : The name of the planet the camera is following (or "Sun")
-(define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name])
+; - speed-index      : The current index in the speed-levels list (0, 1, 2...)
+(define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index])
 
 ;; Constants:
 ; -----------------
@@ -89,6 +90,18 @@
 (define URANUS (make-celestial-body "Uranus" 12 (* 7 ORBIT-STEP) "lightblue" 6 (* 0.012 SPEED-SCALE)))
 (define NEPTUNE (make-celestial-body "Neptune" 11 (* 8 ORBIT-STEP) "navy" 0.5 (* 0.006 SPEED-SCALE)))
 
+;; Predefined Speed Levels: (List "Label Name" Multiplier-Value)
+(define SPEED-LEVELS
+  (list
+   (list "Paused"       0.0)
+   (list "30 Min/Sec"   0.0015)
+   (list "5 Hours/Sec"  0.015)
+   (list "1 Day/Sec"    0.07)
+   (list "15 Days/Sec"  1.0)     ; Original Normal Speed
+   (list "1 Month/Sec"  2.0)
+   (list "6 Months/Sec" 12.0)
+   (list "1 Year/Sec"   24.0)))
+
 ; size of overall scene
 (define SCENE-WIDTH 1496)  
 (define SCENE-HEIGHT 840) 
@@ -100,22 +113,23 @@
 (define INITIAL-SOLAR-SYSTEM
   (list SUN MERCURY VENUS EARTH MARS JUPITER SATURN URANUS NEPTUNE))
 
-; initial state: zoom=1, mouse at (0,0), locked on "Sun"
-(define INITIAL-STATE (make-sim-state INITIAL-SOLAR-SYSTEM 1 0 0 "Sun")) 
+; initial state: zoom=1, mouse at (0,0), locked on "Sun", speed-index=4 (which is "15 Days/Sec")
+(define INITIAL-STATE (make-sim-state INITIAL-SOLAR-SYSTEM 1 0 0 "Sun" 4)) 
 
 ;; Functions:
 ; -----------------
 
-; next-body-state : CelestialBody -> CelestialBody
-; given a celestial body, produce a body just like it but with its angle increased by its angular speed
-; header: (define (next-body-state body) CelestialBody)
+; next-body-state : CelestialBody Number -> CelestialBody
+; given a celestial body and speed multiplier, produce a body just like it but with its angle increased
+; header: (define (next-body-state body speed-mult) CelestialBody)
 ; template:
 
-(define (next-body-state body)
+(define (next-body-state body speed-mult)
   (make-celestial-body 
    (celestial-body-name body) (celestial-body-radius body)
    (celestial-body-orbit-au body) (celestial-body-color body)
-   (+ (celestial-body-angle body) (celestial-body-angular-speed body)) ; increase the angle by how much the planet rotates during one tick
+   ; Increase angle based on angular-speed AND the speed multiplier
+   (+ (celestial-body-angle body) (* (celestial-body-angular-speed body) speed-mult)) 
    (celestial-body-angular-speed body)))
 
 ; angle-to-location : CelestialBody -> Location
@@ -148,20 +162,25 @@
 
 (define (next-world current-state)
   (local [
+          (define current-idx (sim-state-speed-index current-state))
+          ; Get the multiplier value (second element) from the current speed pair
+          (define speed-mult (second (list-ref SPEED-LEVELS current-idx)))
+
           (define (update-bodies bodies)
             (cond 
-              [(empty? bodies) '()]                           ; Base case: empty list returns empty list
-              [else (cons (next-body-state (first bodies))    ; Apply transformation to the head
-                          (update-bodies (rest bodies)))]))]  ; Recursive case
+              [(empty? bodies) '()]                                      ; Base case: empty list returns empty list
+              [else (cons (next-body-state (first bodies) speed-mult)    ; Apply transformation to the head with speed
+                          (update-bodies (rest bodies)))]))]             ; Recursive case
     (make-sim-state 
      (update-bodies (sim-state-bodies current-state))
      (sim-state-zoom current-state)
      (sim-state-mouse-x current-state)
      (sim-state-mouse-y current-state)
-     (sim-state-locked-body-name current-state))))
+     (sim-state-locked-body-name current-state)
+     (sim-state-speed-index current-state))))
 
 ; handle-key : SimState String -> SimState
-; changes the zoom level when Up/Down arrows or +/- keys are pressed
+; changes the zoom level or speed index when Up/Down arrows or +/- keys are pressed
 ; header: (define (handle-key current-state key) SimState)
 ; template:
 
@@ -170,12 +189,22 @@
           (define bodies (sim-state-bodies current-state))
           (define mx (sim-state-mouse-x current-state))
           (define my (sim-state-mouse-y current-state))
-          (define locked (sim-state-locked-body-name current-state))]
+          (define locked (sim-state-locked-body-name current-state))
+          (define idx (sim-state-speed-index current-state))
+          (define max-idx (- (length SPEED-LEVELS) 1))]
     (cond
+      ; Zoom Controls:
       [(or (key=? key "up") (key=? key "="))                   ; Zoom IN
-       (make-sim-state bodies (+ current-zoom 0.1) mx my locked)]
+       (make-sim-state bodies (+ current-zoom 0.1) mx my locked idx)]
       [(or (key=? key "down") (key=? key "-"))                 ; Zoom OUT
-       (make-sim-state bodies (max 0.1 (- current-zoom 0.1)) mx my locked)] 
+       (make-sim-state bodies (max 0.1 (- current-zoom 0.1)) mx my locked idx)] 
+      
+      ; Speed Controls - Cycle through predefined levels
+      [(key=? key "i")                                         ; Increase Speed Index
+       (make-sim-state bodies current-zoom mx my locked (min max-idx (+ idx 1)))]
+      [(key=? key "d")                                         ; Decrease Speed Index
+       (make-sim-state bodies current-zoom mx my locked (max 0 (- idx 1)))]
+      
       [else current-state])))
 
 ; handle-mouse : SimState Number Number MouseEvent -> SimState
@@ -188,15 +217,16 @@
           (define bodies (sim-state-bodies current-state))
           (define zoom (sim-state-zoom current-state))
           (define locked-name (sim-state-locked-body-name current-state))
+          (define idx (sim-state-speed-index current-state))
           
-          ;; Logic to find which planet was clicked
+          ; Logic to find which planet was clicked
           (define (get-clicked-planet-name bodies)
             (cond
               [(empty? bodies) locked-name] 
               [else
                (local [
                        (define body (first bodies))
-                       ;; Calculate where this planet is currently drawn on screen
+                       ; Calculate where this planet is currently drawn on screen
                        (define target-body (find-body-by-name (sim-state-bodies current-state) locked-name))
                        (define target-loc (angle-to-location target-body))
                        (define body-loc (angle-to-location body))
@@ -215,9 +245,9 @@
     
     (cond
       [(mouse=? event "button-down")
-       (make-sim-state bodies zoom x y (get-clicked-planet-name bodies))]
+       (make-sim-state bodies zoom x y (get-clicked-planet-name bodies) idx)]
       [else 
-       (make-sim-state bodies zoom x y locked-name)])))
+       (make-sim-state bodies zoom x y locked-name idx)])))
 
 ; draw-world : SimState -> Image
 ; draw all celestial bodies of the world with zoom and camera tracking
@@ -231,22 +261,26 @@
           (define mx (sim-state-mouse-x current-state))
           (define my (sim-state-mouse-y current-state))
           (define locked-name (sim-state-locked-body-name current-state))
+          (define idx (sim-state-speed-index current-state))
           
-          ;; CAMERA LOGIC: Find the target body and its location
+          ; Retrieve the Speed Label (first element) from the list using the current index
+          (define speed-label (first (list-ref SPEED-LEVELS idx)))
+          
+          ; Camera logic: Find the target body and its location
           (define target-body (find-body-by-name bodies locked-name))
           (define target-loc (angle-to-location target-body))
 
-          (define (draw-body body scene)                            
-            (local [(define loc (angle-to-location body))           
+          (define (draw-body body scene) 
+            (local [(define loc (angle-to-location body)) 
                     (define radius-orbit (celestial-body-orbit-au body))
                     (define zoomed-orbit-radius (* radius-orbit zoom))
                     
-                    ;; CAMERA SHIFT calculation: (PlanetPos - TargetPos)
-                    ;; If a planet is the target, its relative pos is 0, so it draws at center.
+                    ; Camera shift calculation: (PlanetPos - TargetPos)
+                    ; If a planet is the target, its relative pos is 0, so it draws at center.
                     (define relative-x (- (location-x loc) (location-x target-loc)))
                     (define relative-y (- (location-y loc) (location-y target-loc)))
                     
-                    ;; ORBIT DRAWING (Only if locked on Sun to prevent visual clutter)
+                    ; Orbit drawing (Only if locked on Sun to prevent visual clutter)
                     (define orbit-img (circle (max 1 zoomed-orbit-radius) "outline" (color 255 255 255 50)))
                     (define scene-with-orbit
                       (if (and (> radius-orbit 0) (string=? locked-name "Sun"))
@@ -272,7 +306,7 @@
                     (define x (+ CENTER-X (* relative-x zoom)))
                     (define y (+ CENTER-Y (* relative-y zoom)))
                     
-                    ;; HOVER EFFECT
+                    ; Hover effect
                     (define distance (sqrt (+ (sqr (- mx x)) (sqr (- my y)))))
                     (define planet-radius (/ (image-width final-planet-image) 2))
                     (define is-hovering (< distance planet-radius))
@@ -295,15 +329,35 @@
           (define (draw-all-bodies bodies-remaining current-scene)
             (cond
               [(empty? bodies-remaining) current-scene]                ; Base case
-              [else
+              [else 
                (draw-all-bodies (rest bodies-remaining)                ; Recursive case
                (draw-body (first bodies-remaining) current-scene))]))
+          
+          ; Heads-Up Display (Top Left: Camera + Speed)
+          (define HUD-IMAGE
+            (above/align "left"
+              (text (string-append "Camera Locked: " locked-name) 16 "white")
+              (text "" 2 "black")
+              (text (string-append "Speed: " speed-label) 16 "white")))
+
+          ; Legend (Bottom Left)
+          (define LEGEND-IMAGE
+            (above/align "left"
+              (text "LEGEND" 16 "yellow")
+              (text "" 2 "black")
+              (text "Arrows: Zoom In/Out" 14 "white")
+              (text "" 2 "black")
+              (text "I / D: Speed Up/Down" 14 "white") 
+              (text "" 2 "black")  
+              (text "Click Planet: Lock Camera" 14 "white"))) 
           ]
     
-    ; Draw Info Text
-    (place-image (text (string-append "Camera Locked: " locked-name) 16 "white") 
-                 100 30
-                 (draw-all-bodies bodies EMPTY-SCENE))))
+    ; Draw everything on the scene
+    (place-image HUD-IMAGE 
+                 120 50  ; Heads-Up Display Position (x, y) - Top Left
+                 (place-image LEGEND-IMAGE 
+                              120 (- SCENE-HEIGHT 60) ; Legend Position - Bottom Left 
+                              (draw-all-bodies bodies EMPTY-SCENE)))))
 
 ; main : SimState -> SimState
 ; run the solar-system animation starting from the given world 
