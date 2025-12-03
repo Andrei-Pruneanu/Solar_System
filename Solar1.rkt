@@ -334,7 +334,7 @@
                (draw-body (first bodies-remaining) current-scene))]))
           
           ; Heads-Up Display (Top Left: Camera + Speed)
-          (define HUD-IMAGE
+          (define HUD-IMAGE 
             (above/align "left"
               (text (string-append "Camera Locked: " locked-name) 16 "white")
               (text "" 2 "black")
@@ -355,7 +355,7 @@
     ; Draw everything on the scene
     (place-image HUD-IMAGE 
                  120 50  ; Heads-Up Display Position (x, y) - Top Left
-                 (place-image LEGEND-IMAGE 
+                 (place-image LEGEND-IMAGE
                               120 (- SCENE-HEIGHT 60) ; Legend Position - Bottom Left 
                               (draw-all-bodies bodies EMPTY-SCENE)))))
 
