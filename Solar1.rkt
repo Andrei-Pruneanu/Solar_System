@@ -107,7 +107,21 @@
 (define SCENE-HEIGHT 840) 
 (define CENTER-X (/ SCENE-WIDTH 2))
 (define CENTER-Y (/ SCENE-HEIGHT 2))
-(define EMPTY-SCENE (empty-scene SCENE-WIDTH SCENE-HEIGHT "black"))
+
+; Star generator:
+(define BLACK-BACKGROUND (empty-scene SCENE-WIDTH SCENE-HEIGHT "black"))
+
+(define (generate-stars n scene)
+  (cond
+    [(= n 0) scene]                                ; Base case
+    [else
+     (place-image
+      (circle (max 1 (random 3)) "solid" "white")  ; Random size (1 or 2 pixels)
+      (random SCENE-WIDTH)                         ; Random x
+      (random SCENE-HEIGHT)                        ; Random y
+      (generate-stars (- n 1) scene))]))           ; Recursive case 
+
+(define EMPTY-SCENE (generate-stars 200 BLACK-BACKGROUND)) ; Final scene with 200 stars
 
 ; list of planets
 (define INITIAL-SOLAR-SYSTEM
@@ -350,7 +364,7 @@
               (text "I / D: Speed Up/Down" 14 "white") 
               (text "" 2 "black")  
               (text "Click Planet: Lock Camera" 14 "white"))) 
-          ]
+          ] 
     
     ; Draw everything on the scene
     (place-image HUD-IMAGE 
