@@ -132,8 +132,8 @@
 ; - size    : visual size
 (define-struct comet [x y vx vy size])
 
-; A SimState is a structure: (define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index active-tab gallery-index asteroid-belt active-comets])
-;                            make-sim-state : List<CelestialBody> Number Number Number String Number String Number List<Asteroid> List<Comet> -> SimState
+; A SimState is a structure: (define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index active-tab gallery-index asteroid-belt active-comets day-counter])
+;                            make-sim-state : List<CelestialBody> Number Number Number String Number String Number List<Asteroid> List<Comet> Number -> SimState
 ; interpretation:
 ; - bodies            : list of planets
 ; - zoom              : current zoom level
@@ -144,7 +144,8 @@
 ; - gallery-index     : current photo index (1, 2, or 3) for the gallery
 ; - asteroid-belt     : list of active asteroids
 ; - active-comets     : list of active comets
-(define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index active-tab gallery-index asteroid-belt active-comets])
+; - day-counter       : the total number of days passed since Jan 1st, 2025 (e.g., 345)
+(define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index active-tab gallery-index asteroid-belt active-comets day-counter])
 
 ; -----------------------------
 ; 3. HELPER FUNCTIONS & LOGIC
@@ -319,7 +320,7 @@
 (define INITIAL-ASTEROIDS (generate-asteroids 400)) 
 (define INITIAL-SOLAR-SYSTEM (list SUN MERCURY VENUS EARTH MARS JUPITER SATURN URANUS NEPTUNE))
 ; Note: gallery-index starts at 1
-(define INITIAL-STATE (make-sim-state INITIAL-SOLAR-SYSTEM 0.7 0 0 "Sun" 4 "STATS" 1 INITIAL-ASTEROIDS '())) 
+(define INITIAL-STATE (make-sim-state INITIAL-SOLAR-SYSTEM 0.7 0 0 "Sun" 4 "STATS" 1 INITIAL-ASTEROIDS '() 345)) 
 
 ; -----------------------------
 ; 6. PHYSICS & UPDATES
@@ -466,6 +467,9 @@
           (define bodies (sim-state-bodies current-state))
           (define asteroids (sim-state-asteroid-belt current-state))
           (define comets (sim-state-active-comets current-state))
+          ; Time update
+          (define current-days (sim-state-day-counter current-state))
+          (define next-days (+ current-days (* speed-mult 0.2)))
 
           ; update-bodies : List<CelestialBody> -> List<CelestialBody>
           ; Updates position/angle of all bodies based on speed-mult
@@ -484,7 +488,8 @@
      (sim-state-active-tab current-state)
      (sim-state-gallery-index current-state) 
      (update-asteroids asteroids speed-mult)
-     (maybe-spawn-comet (filter-comets comets)))))
+     (maybe-spawn-comet (filter-comets comets))
+     next-days)))
 
 
 ; -----------------------------
@@ -600,7 +605,7 @@
 ; Draws the HUD, Legend, and Info Panel (Stats, Info, Photos)
 ; header: (define (draw-interface locked-name speed-label tab gal-idx scene) Image)
 
-(define (draw-interface locked-name speed-label tab gal-idx scene)
+(define (draw-interface locked-name speed-label tab gal-idx day-count scene)
   (local [; List<String>
           (define info-list (get-planet-info locked-name))
           ; String (extracted data)
@@ -612,9 +617,16 @@
           (define phot-color  (if (string=? tab "PHOTOS") "cornflowerblue" "gray"))
           
           ; ARROW IMAGES DEFINITION (Used for both drawing and hit-box logic consistency)
-          (define ARROW-LEFT (overlay (text "<" 20 "white") (square 30 "solid" "gray")))
+          (define ARROW-LEFT (overlay  (text "<" 20 "white") (square 30 "solid" "gray")))
           (define ARROW-RIGHT (overlay (text ">" 20 "white") (square 30 "solid" "gray")))
 
+          ; Convert exact day count to integer
+          (define total-days (floor day-count))
+          ; Calculate Year (starting from 2025)
+          (define current-year (+ 2025 (floor (/ total-days 365))))
+          ; Calculate Day of Year (0-364)
+          (define current-day (modulo total-days 365))
+          
           ; Image
           ; The content displayed inside the main panel based on the active tab
           (define content-text
@@ -669,7 +681,12 @@
           (define hud (above/align "left"
                                    (text (string-append "Camera: " locked-name) 16 "white")
                                    (text "" 2 "black")
-                                   (text (string-append "Speed: " speed-label) 16 "white")))
+                                   (text (string-append "Speed: " speed-label) 16 "white")
+                                   ; Display date
+                                   (text "" 2 "black")
+                                   (text (string-append "Year: " (number->string current-year)) 16 "yellow")
+                                   (text "" 2 "black")
+                                   (text (string-append "Day: " (number->string current-day)) 16 "yellow")))
           (define legend (above/align "left"
                                       (text "LEGEND" 16 "yellow") 
                                       (text "" 5 "black")
@@ -708,6 +725,7 @@
           (define asteroids (sim-state-asteroid-belt current-state))
           (define comets (sim-state-active-comets current-state))
           (define speed-label (first (list-ref SPEED-LEVELS idx)))
+          (define day-cnt (sim-state-day-counter current-state))
           ; CelestialBody (The object the camera follows)
           (define target-body (find-body-by-name bodies locked-name))
           ; Location (The coordinates of that object)
@@ -718,7 +736,7 @@
                (draw-asteroids asteroids target-loc zoom 
                  (draw-all-bodies bodies target-loc locked-name zoom mx my EMPTY-SCENE))))]
     
-    (draw-interface locked-name speed-label tab gal space-scene)))
+    (draw-interface locked-name speed-label tab gal day-cnt space-scene)))
 
 ; -----------------------------
 ; 8. INPUT HANDLERS
@@ -742,17 +760,19 @@
           (define gal (sim-state-gallery-index current-state))
           (define asteroids (sim-state-asteroid-belt current-state))
           (define comets (sim-state-active-comets current-state))
+          (define days (sim-state-day-counter current-state))
           (define max-idx (- (length SPEED-LEVELS) 1))]
     
     (cond
       [(or (key=? key "up") (key=? key "="))                    ; Zoom IN      
-       (make-sim-state bodies (+ current-zoom 0.1) mx my locked idx tab gal asteroids comets)]
+       (make-sim-state bodies (+ current-zoom 0.1) mx my locked idx tab gal asteroids comets days)]
       [(or (key=? key "down") (key=? key "-"))                  ; Zoom OUT
-       (make-sim-state bodies (max 0.1 (- current-zoom 0.1)) mx my locked idx tab gal asteroids comets)] 
+       (make-sim-state bodies (max 0.1 (- current-zoom 0.1)) mx my locked idx tab gal asteroids comets days)] 
       [(key=? key "i")                                          ; Increase speed
-       (make-sim-state bodies current-zoom mx my locked (min max-idx (+ idx 1)) tab gal asteroids comets)]
+       (make-sim-state bodies current-zoom mx my locked (min max-idx (+ idx 1)) tab gal asteroids comets days)]
       [(key=? key "d")                                          ; Decrease speed
-       (make-sim-state bodies current-zoom mx my locked (max 0 (- idx 1)) tab gal asteroids comets)]
+       (make-sim-state bodies current-zoom mx my locked (max 0 (- idx 1)) tab gal asteroids comets days)]
+      [(key=? key "r") INITIAL-STATE] ; Full reset for year and day
       [else current-state])))
 
 ;; Input/output
@@ -770,6 +790,7 @@
           (define gal (sim-state-gallery-index current-state))
           (define asteroids (sim-state-asteroid-belt current-state))
           (define comets (sim-state-active-comets current-state))
+          (define days (sim-state-day-counter current-state))
           ; Boolean (Hit detection for UI elements)
           (define click-in-panel? (and (> x PANEL-X) (< x (+ PANEL-X PANEL-WIDTH)) (> y PANEL-Y) (< y (+ PANEL-Y PANEL-HEIGHT))))
           (define click-stats-btn? (and (> x PANEL-X) (< x (+ PANEL-X BUTTON-WIDTH)) (> y PANEL-Y) (< y (+ PANEL-Y BUTTON-HEIGHT))))
@@ -781,7 +802,7 @@
           (define click-left-arrow? (and (string=? tab "PHOTOS") (> x (+ PANEL-X 45)) (< x (+ PANEL-X 75)) (> y (+ PANEL-Y 225)) (< y (+ PANEL-Y 255))))
           (define click-right-arrow? (and (string=? tab "PHOTOS") (> x (+ PANEL-X 275)) (< x (+ PANEL-X 305)) (> y (+ PANEL-Y 225)) (< y (+ PANEL-Y 255))))
           
-          ; get-clicked-planet-name : List<CelestialBody> -> String
+          ; get-clicked-planet-name : List<CelestialBody> -> String 
           ; Checks if the mouse click coordinates (x,y) are near a planet
           (define (get-clicked-planet-name bodies)
             (cond [(empty? bodies) locked-name] 
@@ -799,17 +820,17 @@
     (cond
       [(mouse=? event "button-down")
        (cond
-         [click-stats-btn? (make-sim-state bodies zoom x y locked-name idx "STATS" gal asteroids comets)]
-         [click-info-btn?  (make-sim-state bodies zoom x y locked-name idx "INFO" gal asteroids comets)]
-         [click-photo-btn? (make-sim-state bodies zoom x y locked-name idx "PHOTOS" gal asteroids comets)]
+         [click-stats-btn? (make-sim-state bodies zoom x y locked-name idx "STATS" gal asteroids comets days)]
+         [click-info-btn?  (make-sim-state bodies zoom x y locked-name idx "INFO" gal asteroids comets days)]
+         [click-photo-btn? (make-sim-state bodies zoom x y locked-name idx "PHOTOS" gal asteroids comets days)]
          
-         [click-left-arrow? (make-sim-state bodies zoom x y locked-name idx tab (if (= gal 1) 3 (- gal 1)) asteroids comets)]
-         [click-right-arrow? (make-sim-state bodies zoom x y locked-name idx tab (if (= gal 3) 1 (+ gal 1)) asteroids comets)]
+         [click-left-arrow? (make-sim-state bodies zoom x y locked-name idx tab (if (= gal 1) 3 (- gal 1)) asteroids comets days)]
+         [click-right-arrow? (make-sim-state bodies zoom x y locked-name idx tab (if (= gal 3) 1 (+ gal 1)) asteroids comets days)]
          
          [click-in-panel? current-state]
          ; Reset Gallery Index to 1 when switching planets
-         [else (make-sim-state bodies zoom x y (get-clicked-planet-name bodies) idx tab 1 asteroids comets)])]
-      [else (make-sim-state bodies zoom x y locked-name idx tab gal asteroids comets)])))
+         [else (make-sim-state bodies zoom x y (get-clicked-planet-name bodies) idx tab 1 asteroids comets days)])]
+      [else (make-sim-state bodies zoom x y locked-name idx tab gal asteroids comets days)])))
 
 ; main : SimState -> SimState
 ; run the solar-system animation starting from the given world
