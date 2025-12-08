@@ -20,11 +20,11 @@
 (define VENUS-RAW-IMAGE (bitmap/file "./img/venus.png"))
 (define VENUS-FINAL-IMAGE (scale 0.02 VENUS-RAW-IMAGE))
 (define MARS-RAW-IMAGE (bitmap/file "./img/mars.png"))
-(define MARS-FINAL-IMAGE (scale 0.02 MARS-RAW-IMAGE))
+(define MARS-FINAL-IMAGE (scale 0.02 MARS-RAW-IMAGE)) 
 (define JUPITER-RAW-IMAGE (bitmap/file "./img/jupiter.png"))
 (define JUPITER-FINAL-IMAGE (scale 0.043 JUPITER-RAW-IMAGE))
 (define SATURN-RAW-IMAGE (bitmap/file "./img/saturn.png"))
-(define SATURN-FINAL-IMAGE (scale 0.08 SATURN-RAW-IMAGE))
+(define SATURN-FINAL-IMAGE (scale 0.12 SATURN-RAW-IMAGE))
 (define URANUS-RAW-IMAGE (bitmap/file "./img/uranus.png"))
 (define URANUS-FINAL-IMAGE (scale 0.015 URANUS-RAW-IMAGE)) 
 (define NEPTUNE-RAW-IMAGE (bitmap/file "./img/neptune.png"))
@@ -186,6 +186,12 @@
         [(string=? (celestial-body-name (first bodies)) name) (first bodies)] 
         [else (find-body-by-name (rest bodies) name)]))
 
+; Tests
+(define SHORT-LIST (list (make-celestial-body "A" 1 1 "c" 0 0 '())
+                         (make-celestial-body "B" 2 2 "d" 0 0 '())))
+(check-expect (celestial-body-name (find-body-by-name SHORT-LIST "Z")) "Sun")
+(check-expect (find-body-by-name SHORT-LIST "B") (make-celestial-body "B" 2 2 "d" 0 0 '()))
+
 ;; Input/output
 ; get-planet-info : String -> List<String>
 ; Returns a list of strings containing stats and description for a specific planet
@@ -219,11 +225,12 @@
 
 ; Tests
 (check-expect (first (get-planet-info "Earth")) "5.972 x 10^24 kg")
+(check-expect (get-planet-info "Pluto") (list "?" "?" "?" "No Data" "Available" ".")) 
 
 ;; Input/output
 ; get-gallery-image : String Number -> Image
 ; Returns the photo from the PRE-LOADED gallery lists based on index (1, 2, 3)
-; header: (define (get-gallery-image name idx) Image)
+; header: (define (get-gallery-image name idx) Image) 
 
 (define (get-gallery-image name idx)
   (local [
@@ -331,6 +338,11 @@
                   (+ (satellite-angle moon) (* (satellite-speed moon) speed-mult))
                   (satellite-speed moon)))
 
+; Tests
+(define TEST-MOON (make-satellite "Moon" 5 100 "white" 0 2))
+(check-expect (next-satellite-state TEST-MOON 1) (make-satellite "Moon" 5 100 "white" 2 2))
+(check-expect (next-satellite-state TEST-MOON 0.5) (make-satellite "Moon" 5 100 "white" 1 2)) 
+
 ;; Input/output
 ; update-satellites : List<Satellite> Number -> List<Satellite>
 ; Updates a list of satellites
@@ -370,6 +382,11 @@
                  (asteroid-size ast)
                  (asteroid-color ast)))
 
+; Tests
+(define TEST-AST (make-asteroid 100 500 5 2 "gray"))
+(check-expect (next-asteroid TEST-AST 0) (make-asteroid 100 500 5 2 "gray"))
+(check-expect (next-asteroid TEST-AST 2) (make-asteroid 110 500 5 2 "gray"))
+
 ;; Input/output
 ; update-asteroids : List<Asteroid> Number -> List<Asteroid>
 ; Updates list of asteroids.
@@ -392,6 +409,11 @@
               (comet-vy c)
               (comet-size c)))
 
+; Tests
+(define TEST-COMET (make-comet 100 100 5 -2 10))
+(check-expect (next-comet TEST-COMET) (make-comet 105 98 5 -2 10))
+(check-expect (next-comet (make-comet 50 50 0 0 5)) (make-comet 50 50 0 0 5))
+
 ;; Input/output
 ; filter-comets : List<Comet> -> List<Comet>
 ; Removes comets that have moved far off the screen boundaries
@@ -407,6 +429,12 @@
                     (filter-comets (rest comets))
                     (cons (next-comet c)
                           (filter-comets (rest comets)))))]))
+
+; Tests
+(define C-GOOD (make-comet 500 500 0 0 5))
+(define C-BAD (make-comet -300 500 0 0 5))
+(check-expect (filter-comets (list C-GOOD)) (list C-GOOD))
+(check-expect (filter-comets (list C-GOOD C-BAD)) (list C-GOOD))
 
 ;; Input/output
 ; maybe-spawn-comet : List<Comet> -> List<Comet>
