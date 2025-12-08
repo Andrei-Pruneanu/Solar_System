@@ -592,9 +592,19 @@
           (define content-text
             (cond
               [(string=? tab "STATS")
-               (above/align "left" (text (string-append "Mass: " mass) 14 "white") (text " " 8 "black") (text (string-append "Diameter: " diam) 14 "white") (text " " 8 "black") (text (string-append "Temperature: " temp) 14 "white"))]
+               (above/align "left"
+                            (text (string-append "Mass: " mass) 14 "white")
+                            (text " " 8 "black")
+                            (text (string-append "Diameter: " diam) 14 "white")
+                            (text " " 8 "black")
+                            (text (string-append "Temperature: " temp) 14 "white"))]
               [(string=? tab "INFO")
-               (above/align "center" (text desc1 14 "white") (text " " 4 "transparent") (text desc2 14 "white") (text " " 4 "transparent") (text desc3 14 "white"))]
+               (above/align "center"
+                            (text desc1 14 "white")
+                            (text " " 4 "transparent")
+                            (text desc2 14 "white")
+                            (text " " 4 "transparent")
+                            (text desc3 14 "white"))]
               [(string=? tab "PHOTOS")
                (local [
                        (define current-photo (get-gallery-image locked-name gal-idx))
