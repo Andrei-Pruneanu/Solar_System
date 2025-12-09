@@ -26,9 +26,9 @@
 (define SATURN-RAW-IMAGE (bitmap/file "./img/saturn.png"))
 (define SATURN-FINAL-IMAGE (scale 0.12 SATURN-RAW-IMAGE))
 (define URANUS-RAW-IMAGE (bitmap/file "./img/uranus.png"))
-(define URANUS-FINAL-IMAGE (scale 0.015 URANUS-RAW-IMAGE)) 
+(define URANUS-FINAL-IMAGE (scale 0.04 URANUS-RAW-IMAGE)) 
 (define NEPTUNE-RAW-IMAGE (bitmap/file "./img/neptune.png"))
-(define NEPTUNE-FINAL-IMAGE (scale 0.015 NEPTUNE-RAW-IMAGE))
+(define NEPTUNE-FINAL-IMAGE (scale 0.035 NEPTUNE-RAW-IMAGE))
 
 ; --- GALLERY IMAGES ---
 ; We define a helper to load 3 images for a planet at once
