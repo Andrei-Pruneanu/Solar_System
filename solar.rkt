@@ -1,6 +1,6 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname solarnew4) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname solar) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 ; Solar System Simulator
 
 (require 2htdp/image)
@@ -788,6 +788,11 @@
 ; maybe-spawn-comet : List<Comet> -> List<Comet>
 ; Randomly adds a new comet with a very low probability (2 in 3000 chance)
 ; header: (define (maybe-spawn-comet current-comets) List<Comet>)
+; Template:
+; (define (maybe-spawn-comet comets)
+;   (if (< (random 3000) 2)
+;       (cons (make-comet ...) current-comets)
+;       current-comets))
 
 (define (maybe-spawn-comet current-comets)
   (if (< (random 3000) 2) 
