@@ -11,22 +11,31 @@
 ; -----------------------------
 
 ; --- MAIN PLANET IMAGES ---
+; 1. Load Earth
 (define EARTH-RAW-IMAGE (bitmap/file "./img/earth.png"))
-(define EARTH-FINAL-IMAGE (scale 0.03 EARTH-RAW-IMAGE)) 
+(define EARTH-FINAL-IMAGE (scale 0.03 EARTH-RAW-IMAGE))
+; 2. Load Sun
 (define SUN-RAW-IMAGE (bitmap/file "./img/sun.png"))
-(define SUN-FINAL-IMAGE (scale 0.2 SUN-RAW-IMAGE))    
+(define SUN-FINAL-IMAGE (scale 0.2 SUN-RAW-IMAGE))
+; 3. Load Mercury
 (define MERCURY-RAW-IMAGE (bitmap/file "./img/mercury.png"))
-(define MERCURY-FINAL-IMAGE (scale 0.02 MERCURY-RAW-IMAGE))  
+(define MERCURY-FINAL-IMAGE (scale 0.02 MERCURY-RAW-IMAGE))
+; 4. Load Venus
 (define VENUS-RAW-IMAGE (bitmap/file "./img/venus.png"))
 (define VENUS-FINAL-IMAGE (scale 0.02 VENUS-RAW-IMAGE))
+; 5. Load Mars
 (define MARS-RAW-IMAGE (bitmap/file "./img/mars.png"))
-(define MARS-FINAL-IMAGE (scale 0.02 MARS-RAW-IMAGE)) 
+(define MARS-FINAL-IMAGE (scale 0.02 MARS-RAW-IMAGE))
+; 6. Load Jupiter
 (define JUPITER-RAW-IMAGE (bitmap/file "./img/jupiter.png"))
 (define JUPITER-FINAL-IMAGE (scale 0.043 JUPITER-RAW-IMAGE))
+; 7. Load Saturn
 (define SATURN-RAW-IMAGE (bitmap/file "./img/saturn.png"))
 (define SATURN-FINAL-IMAGE (scale 0.12 SATURN-RAW-IMAGE))
+; 8. Load Uranus
 (define URANUS-RAW-IMAGE (bitmap/file "./img/uranus.png"))
-(define URANUS-FINAL-IMAGE (scale 0.04 URANUS-RAW-IMAGE)) 
+(define URANUS-FINAL-IMAGE (scale 0.04 URANUS-RAW-IMAGE))
+; 9. Load Neptune
 (define NEPTUNE-RAW-IMAGE (bitmap/file "./img/neptune.png"))
 (define NEPTUNE-FINAL-IMAGE (scale 0.035 NEPTUNE-RAW-IMAGE))
 
@@ -251,7 +260,8 @@
 
 ; Tests
 (check-expect (first (get-planet-info "Earth")) "5.972 x 10^24 kg")
-(check-expect (get-planet-info "Pluto") (list "?" "?" "?" "No Data" "Available" ".")) 
+(check-expect (get-planet-info "Pluto") (list "?" "?" "?" "No Data" "Available" "."))
+(check-expect (third (get-planet-info "Mars")) "-65 C")
 
 ;; Input/output
 ; get-gallery-image : String Number -> Image
@@ -397,6 +407,18 @@
        (probe-launch-time p))
       p))
 
+; Tests
+; Define a probe at (0,0) moving (5,5) pixels per tick with 100 fuel
+(define MOVING-PROBE (make-probe 0 0 5 5 100 "in-transit" "A" "B" 0))
+; Test 1: Check X position update (0 + 5 = 5)
+(check-expect (probe-x (update-probe-smart MOVING-PROBE 1 '())) 5)
+; Test 2: Check Y position update (0 + 5 = 5)
+(check-expect (probe-y (update-probe-smart MOVING-PROBE 1 '())) 5)
+; Test 3: Check Fuel consumption (100 - 0.01 = 99.99)
+(check-within (probe-fuel (update-probe-smart MOVING-PROBE 1 '())) 99.99 0.001)
+; Test 4: An 'arrived' probe should NOT move
+(define STOPPED-PROBE (make-probe 100 100 5 5 50 "arrived" "A" "B" 0))
+(check-expect (probe-x (update-probe-smart STOPPED-PROBE 1 '())) 100)
 
 ;; Input/output
 ; check-arrival-dynamic : Probe List<CelestialBody> -> Probe
@@ -422,6 +444,22 @@
                        (probe-launch-time p))
             p))
       p))
+
+; Tests
+; Target planet is at Distance 100, Angle 0. So location is (100, 0)
+(define TEST-TARGET (make-celestial-body "Target" 10 100 "red" 0 0 '()))
+(define TEST-SYSTEM (list TEST-TARGET))
+; Case 1: Probe is FAR away (at x=200). Distance is 100. Should NOT arrive
+(define PROBE-FAR (make-probe 200 0 -1 0 100 "in-transit" "Origin" "Target" 0))
+(check-expect (probe-status (check-arrival-dynamic PROBE-FAR TEST-SYSTEM)) "in-transit")
+
+; Case 2: Probe is CLOSE (at x=110). Distance is 10. Should ARRIVE
+; (Hitbox is 40 pixels).
+(define PROBE-CLOSE (make-probe 110 0 -1 0 100 "in-transit" "Origin" "Target" 0))
+(check-expect (probe-status (check-arrival-dynamic PROBE-CLOSE TEST-SYSTEM)) "arrived")
+
+; Case 3: Verify velocity becomes 0 when arrived
+(check-expect (probe-vx (check-arrival-dynamic PROBE-CLOSE TEST-SYSTEM)) 0)
 
 ;; Input/output
 ; update-missions-smart : List<Mission> List<CelestialBody> Number -> List<Mission>
@@ -1249,7 +1287,7 @@
 ; run the solar-system animation starting from the given world
 (define (main initial-state)
   (big-bang initial-state
-    (on-tick next-world 1/100)
+    (on-tick next-world 1/100) 
     (to-draw draw-world)
     (on-key handle-key)
     (on-mouse handle-mouse)))
