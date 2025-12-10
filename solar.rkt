@@ -89,7 +89,7 @@
         (list "15 Days/Sec" 1.0)   ; Original Normal Speed
         (list "1 Month/Sec" 2.0)
         (list "6 Months/Sec" 12.0)
-        (list "1 Year/Sec" 24.0)))
+        (list "1 Year/Sec" 85.0)))
 
 ; -----------------------------
 ; 2. DATA DEFINITIONS
