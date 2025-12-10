@@ -58,7 +58,7 @@
 (define GAL-NEPTUNE (load-gallery "neptune"))
 
 ; Simulation Constants
-(define SPEED-SCALE 0.01)  
+(define SPEED-SCALE 0.0035)  
 (define ORBIT-STEP 110)    ; the distance (in pixels) between the orbits of the planets
 
 ; Size of overall scene
