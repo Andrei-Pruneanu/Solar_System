@@ -1,7 +1,6 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname solarnew2) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
-
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname solarnew4) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 ; Solar System Simulator
 
 (require 2htdp/image)
@@ -27,9 +26,9 @@
 (define SATURN-RAW-IMAGE (bitmap/file "./img/saturn.png"))
 (define SATURN-FINAL-IMAGE (scale 0.12 SATURN-RAW-IMAGE))
 (define URANUS-RAW-IMAGE (bitmap/file "./img/uranus.png"))
-(define URANUS-FINAL-IMAGE (scale 0.015 URANUS-RAW-IMAGE)) 
+(define URANUS-FINAL-IMAGE (scale 0.04 URANUS-RAW-IMAGE)) 
 (define NEPTUNE-RAW-IMAGE (bitmap/file "./img/neptune.png"))
-(define NEPTUNE-FINAL-IMAGE (scale 0.015 NEPTUNE-RAW-IMAGE))
+(define NEPTUNE-FINAL-IMAGE (scale 0.035 NEPTUNE-RAW-IMAGE))
 
 ; --- GALLERY IMAGES ---
 ; We define a helper to load 3 images for a planet at once
@@ -85,7 +84,7 @@
 
 ; -----------------------------
 ; 2. DATA DEFINITIONS
-; -----------------------------
+; ----------------------------- 
 
 ; A Location is a structure: (define-struct location [x y])
 ;                            make-location : Number Number -> Location
@@ -106,15 +105,14 @@
 ; A Probe is a structure: (define-struct probe [x y vx vy fuel status departure-planet target-planet launch-time])
 ;                         make-probe : Number Number Number Number Number String String String Number -> Probe
 ; interpretation:
-; - x, y          : current position in pixels (relative to center)
-; - vx, vy        : velocity vector (pixels per tick)
-; - fuel          : remaining fuel percentage (0-100)
-; - status        : "planning" | "launching" | "in-transit" | "arrived" | "failed"
+; - x, y             : current position in pixels (relative to center)
+; - vx, vy           : velocity vector (pixels per tick)
+; - fuel             : remaining fuel percentage (0-100)
+; - status           : "planning" | "launching" | "in-transit" | "arrived" | "failed"
 ; - departure-planet : name of starting planet
-; - target-planet : name of destination planet
-; - launch-time   : simulation time when launched (in ticks)
+; - target-planet    : name of destination planet
+; - launch-time      : simulation time when launched (in ticks)
 (define-struct probe [x y vx vy fuel status departure-planet target-planet launch-time])
-
 
 ; A Mission is a structure: (define-struct mission [departure target status probe])
 ;                           make-mission : String String String Probe -> Mission
@@ -124,8 +122,6 @@
 ; - status    : "planning" | "active" | "completed" | "failed"
 ; - probe     : the probe object (or #f if not launched yet)
 (define-struct mission [departure target status probe])
-
-
 
 ; A CelestialBody is a structure: (define-struct celestial-body [name radius orbit-au color angle angular-speed satellites])
 ;                                 make-celestial-body : String Number Number String Number Number Number -> CelestialBody
@@ -160,19 +156,21 @@
 ; A SimState is a structure: (define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index active-tab gallery-index asteroid-belt active-comets day-counter])
 ;                            make-sim-state : List<CelestialBody> Number Number Number String Number String Number List<Asteroid> List<Comet> -> SimState
 ; interpretation:
-; - bodies            : list of planets
-; - zoom              : current zoom level
-; - mouse-x, mouse-y  : mouse coordinates
-; - locked-body-name  : name of the planet the camera is following
-; - speed-index       : index in SPEED-LEVELS list
-; - active-tab        : current UI tab ("STATS", "INFO", or "PHOTOS")
-; - gallery-index     : current photo index (1, 2, or 3) for the gallery
-; - asteroid-belt     : list of active asteroids
-; - active-comets     : list of active comets
-; - day-counter       : the total number of days passed since Jan 1st, 2025 (e.g., 345)
-(define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index 
-                                 active-tab gallery-index asteroid-belt active-comets
-                                 active-missions mission-mode selected-departure sim-time day-counter])
+; - bodies             : list of planets
+; - zoom               : current zoom level
+; - mouse-x, mouse-y   : mouse coordinates
+; - locked-body-name   : name of the planet the camera is following
+; - speed-index        : index in SPEED-LEVELS list
+; - active-tab         : current UI tab ("STATS", "INFO", or "PHOTOS")
+; - gallery-index      : current photo index (1, 2, or 3) for the gallery
+; - asteroid-belt      : list of active asteroids
+; - active-comets      : list of active comets
+; - active-missions    : list of Mission objects currently running or completed
+; - mission-mode       : "none" | "selecting-departure" | "selecting-target"
+; - selected-departure : name of the planet chosen as the start of a mission
+; - sim-time           : absolute simulation ticks counter (used for physics calculations)
+; - day-counter        : the total number of days passed since Jan 1st, 2025 (e.g., 345)
+(define-struct sim-state [bodies zoom mouse-x mouse-y locked-body-name speed-index active-tab gallery-index asteroid-belt active-comets active-missions mission-mode selected-departure sim-time day-counter])
 
 ; -----------------------------
 ; 3. HELPER FUNCTIONS & LOGIC
@@ -280,60 +278,72 @@
     (list-ref gallery-list (- idx 1))))
 
 
-; =============================================================================
-; MISSIONS
-; =============================================================================
+; -----------------------------
+; 4. MISSIONS
+; -----------------------------
 
-;; predict-planet-position : CelestialBody Number -> Location
+;; Input/output
+; predict-planet-position : CelestialBody Number -> Location
+; Predicts the (x, y) location of a planet after a given number of ticks
+; header: (define (predict-planet-position planet ticks) Location)
 (define (predict-planet-position planet ticks)
-  (local [(define future-angle (+ (celestial-body-angle planet)
+  (local [; Calculate the new angle based on angular speed * time
+          (define future-angle (+ (celestial-body-angle planet)
                                   (* (celestial-body-angular-speed planet) ticks)))
           (define orbit-radius (celestial-body-orbit-au planet))]
+    ; Convert polar (angle, radius) to Cartesian (x, y)
     (make-location (* orbit-radius (cos future-angle))
                    (* orbit-radius (sin future-angle)))))
 
-;; calculate-intercept-trajectory : CelestialBody CelestialBody Number -> (list Number Number Number)
-;; Returns: (list vx vy travel-time)
+; Tests
+(check-expect (location-x (predict-planet-position (make-celestial-body "Test" 10 100 "red" 0 0 '()) 10)) 100)
+(check-within (location-y (predict-planet-position (make-celestial-body "Test" 10 100 "red" 0 0 '()) 10)) 0 0.001)
+
+;; Input/output
+; calculate-intercept-trajectory : CelestialBody CelestialBody Number -> (list Number Number Number)
+; Calculates the velocity vector (vx, vy) and travel time to intercept a moving target
+; Returns: (list vx vy travel-time)
+; header: (define (calculate-intercept-trajectory from-planet to-planet speed-mult) (list Number Number Number))
 (define (calculate-intercept-trajectory from-planet to-planet speed-mult)
   (local [(define from-loc (angle-to-location from-planet))
           (define to-angle (celestial-body-angle to-planet))
           (define to-orbit (celestial-body-orbit-au to-planet))
           (define to-angular-speed (celestial-body-angular-speed to-planet))
-          
-          
-          (define actual-angular-speed (* to-angular-speed speed-mult))
-          
-         
+          ; Adjust angular speed by simulation speed multiplier
+          (define actual-angular-speed (* to-angular-speed speed-mult)) 
+          ; Constants for probe physics
           (define base-speed 2.5)
           (define probe-speed base-speed)
-          
-   
+          ; Initial Euclidean distance calculation
           (define dx0 (- (* to-orbit (cos to-angle)) (location-x from-loc)))
           (define dy0 (- (* to-orbit (sin to-angle)) (location-y from-loc)))
           (define initial-distance (sqrt (+ (* dx0 dx0) (* dy0 dy0))))
+          ; Initial guess for time: Distance / Speed
           (define estimated-time (/ initial-distance probe-speed))
           
-          
+          ; refine-trajectory : Number Number -> Number
+          ; Iteratively improves the estimated travel time to account for target movement
           (define (refine-trajectory t iterations)
             (if (= iterations 0)
                 t
-                (local [(define future-angle (+ to-angle (* actual-angular-speed t)))
+                (local [; Where will the target be after time 't'?
+                        (define future-angle (+ to-angle (* actual-angular-speed t)))
                         (define future-x (* to-orbit (cos future-angle)))
                         (define future-y (* to-orbit (sin future-angle)))
+                        ; Calculate distance to that future point
                         (define dx (- future-x (location-x from-loc)))
                         (define dy (- future-y (location-y from-loc)))
                         (define actual-dist (sqrt (+ (* dx dx) (* dy dy))))
+                        ; New time estimate
                         (define new-time (/ actual-dist probe-speed))]
                   (refine-trajectory new-time (- iterations 1)))))
-          
+          ; Run the refinement 5 times for accuracy
           (define final-time (refine-trajectory estimated-time 5))
-          
-         
+          ; Calculate final target position based on refined time
           (define final-angle (+ to-angle (* actual-angular-speed final-time)))
           (define final-x (* to-orbit (cos final-angle)))
           (define final-y (* to-orbit (sin final-angle)))
-          
-          
+          ; Vector math for velocity
           (define dx (- final-x (location-x from-loc)))
           (define dy (- final-y (location-y from-loc)))
           (define final-dist (sqrt (+ (* dx dx) (* dy dy))))
@@ -343,9 +353,13 @@
     
     (list vx vy final-time)))
 
-;; create-intercepting-probe : CelestialBody CelestialBody Number Number -> Probe
+;; Input/output
+; create-intercepting-probe : CelestialBody CelestialBody Number Number -> Probe
+; Creates a new Probe struct initialized with position and velocity to intercept the target
+; header: (define (create-intercepting-probe from-planet to-planet current-time speed-mult) Probe)
 (define (create-intercepting-probe from-planet to-planet current-time speed-mult)
   (local [(define start-loc (angle-to-location from-planet))
+          ; Get the calculated velocity and time
           (define trajectory (calculate-intercept-trajectory from-planet to-planet speed-mult))
           (define vx (first trajectory))
           (define vy (second trajectory))
@@ -355,22 +369,28 @@
      (location-y start-loc)
      vx
      vy
-     100
-     "in-transit"
+     100             ; Start with 100% fuel
+     "in-transit"    ; Initial status
      (celestial-body-name from-planet)
      (celestial-body-name to-planet)
      current-time)))
 
-;; update-probe-smart : Probe Number List<CelestialBody> -> Probe
+;; Input/output
+; update-probe-smart : Probe Number List<CelestialBody> -> Probe
+; Updates the position of a single probe based on its velocity and decreases fuel
+; header: (define (update-probe-smart p speed-mult bodies) Probe)
+; Template:
+; (define (update-probe-smart p mult bodies)
+;   (if (active? p) (make-probe ...) p))
 (define (update-probe-smart p speed-mult bodies)
   (if (or (string=? (probe-status p) "in-transit")
           (string=? (probe-status p) "launching"))
       (make-probe 
-       (+ (probe-x p) (probe-vx p))
-       (+ (probe-y p) (probe-vy p))
+       (+ (probe-x p) (probe-vx p))    ; New X = Old X + Velocity X
+       (+ (probe-y p) (probe-vy p))    ; New Y = Old Y + Velocity Y
        (probe-vx p)
        (probe-vy p)
-       (max 0 (- (probe-fuel p) 0.01))
+       (max 0 (- (probe-fuel p) 0.01)) ; Burn fuel
        "in-transit"
        (probe-departure-planet p)
        (probe-target-planet p)
@@ -378,18 +398,23 @@
       p))
 
 
-;; check-arrival-dynamic : Probe List<CelestialBody> -> Probe
+;; Input/output
+; check-arrival-dynamic : Probe List<CelestialBody> -> Probe
+; Checks if a probe is close enough to its target planet to be considered "arrived"
+; header: (define (check-arrival-dynamic p bodies) Probe)
 (define (check-arrival-dynamic p bodies)
   (if (or (string=? (probe-status p) "in-transit")
           (string=? (probe-status p) "launching"))
       (local [(define target (find-body-by-name bodies (probe-target-planet p)))
               (define target-loc (angle-to-location target))
+              ; Distance formula (Pythagoras) between Probe and Target
               (define dx (- (probe-x p) (location-x target-loc)))
               (define dy (- (probe-y p) (location-y target-loc)))
               (define dist (sqrt (+ (* dx dx) (* dy dy))))
-              ;change the number as "offset" for when the probe arrives
+              ; change the number as "offset" for when the probe arrives
               (define arrival-radius 40)]
         (if (< dist arrival-radius)
+            ; STOP the probe (velocity 0) and mark as ARRIVED
             (make-probe (probe-x p) (probe-y p) 0 0 (probe-fuel p)
                        "arrived"
                        (probe-departure-planet p)
@@ -398,13 +423,20 @@
             p))
       p))
 
-;; update-missions-smart : List<Mission> List<CelestialBody> Number -> List<Mission>
-
+;; Input/output
+; update-missions-smart : List<Mission> List<CelestialBody> Number -> List<Mission>
+; Updates the state of all active missions, moving probes and checking for arrival
+; header: (define (update-missions-smart missions bodies speed-mult) List<Mission>)
+; Template: (Standard recursive list processing)
+; (define (update-missions-smart l ...)
+;   (cond [(empty? l) ...]
+;         [else (... (first l) ... (update-missions-smart (rest l) ...))]))
 (define (update-missions-smart missions bodies speed-mult)
   (cond [(empty? missions) '()]
         [else (local [(define m (first missions))
                       (define p (mission-probe m))]
                 (if (probe? p)
+                    ; 1. Move the probe -> 2. Check if it hit the target -> 3. Update Status
                     (local [(define updated-probe (check-arrival-dynamic 
                                                    (update-probe-smart p speed-mult bodies) 
                                                    bodies))
@@ -416,17 +448,19 @@
                                          new-status
                                          updated-probe)
                             (update-missions-smart (rest missions) bodies speed-mult)))
+                    ; If no probe exists yet, keep mission as is
                     (cons m (update-missions-smart (rest missions) bodies speed-mult))))]))
 
-;; draw-intercept-trajectory : CelestialBody CelestialBody Location Number Number Image -> Image
-
+;; Input/output
+; draw-intercept-trajectory : CelestialBody CelestialBody Location Number Number Image -> Image
+; Draws a dashed line representing the calculated future path of the probe
+; header: (define (draw-intercept-trajectory from-planet to-planet target-loc zoom speed-mult scene) Image)
 (define (draw-intercept-trajectory from-planet to-planet target-loc zoom speed-mult scene)
   (local [(define trajectory (calculate-intercept-trajectory from-planet to-planet speed-mult))
           (define travel-time (third trajectory))
           (define from-loc (angle-to-location from-planet))
           (define future-target-loc (predict-planet-position to-planet travel-time))
-          
-          
+          ; Calculate screen coordinates relative to camera
           (define x1 (+ CENTER-X (* (- (location-x from-loc) (location-x target-loc)) zoom)))
           (define y1 (+ CENTER-Y (* (- (location-y from-loc) (location-y target-loc)) zoom)))
           (define x2 (+ CENTER-X (* (- (location-x future-target-loc) (location-x target-loc)) zoom)))
@@ -434,20 +468,22 @@
     
     (scene+line scene x1 y1 x2 y2 (make-pen "cyan" 2 "long-dash" "round" "round"))))
 
-;; draw-probe-with-trail : Probe Location Number Image -> Image
-
+;; Input/output
+; draw-probe-with-trail : Probe Location Number Image -> Image
+; Draws a probe as a rotated triangle with a fading trail behind it
+; header: (define (draw-probe-with-trail p target-loc zoom scene) Image)
 (define (draw-probe-with-trail p target-loc zoom scene)
   (local [(define draw-x (+ CENTER-X (* (- (probe-x p) (location-x target-loc)) zoom)))
           (define draw-y (+ CENTER-Y (* (- (probe-y p) (location-y target-loc)) zoom)))
           
-         
+          ; Calculate rotation angle for icon
           (define angle-rad (atan (probe-vy p) (probe-vx p)))
           (define angle-deg (* angle-rad (/ 180 pi)))
           
-          
+          ; Visual Elements
           (define probe-icon (rotate (- 90 angle-deg) (triangle 10 "solid" "lime")))
           
-         
+          ; Trail Logic
           (define trail-length 25)
           (define trail-x (- draw-x (* (probe-vx p) trail-length zoom)))
           (define trail-y (- draw-y (* (probe-vy p) trail-length zoom)))]
@@ -456,8 +492,10 @@
                  (scene+line scene trail-x trail-y draw-x draw-y 
                             (make-pen (color 0 255 0 120) 4 "solid" "round" "round")))))
 
-;; draw-all-active-probes : List<Mission> Location Number Image -> Image
-
+;; Input/output
+; draw-all-active-probes : List<Mission> Location Number Image -> Image
+; Recursively draws all probes currently in "launching" or "in-transit" status
+; header: (define (draw-all-active-probes missions target-loc zoom scene) Image)
 (define (draw-all-active-probes missions target-loc zoom scene)
   (cond [(empty? missions) scene]
         [else (local [(define m (first missions))
@@ -469,18 +507,23 @@
                                            (draw-probe-with-trail p target-loc zoom scene))
                     (draw-all-active-probes (rest missions) target-loc zoom scene)))]))
 
-;; launch-intercept-mission : SimState String String -> SimState
-
+;; Input/output
+; launch-intercept-mission : SimState String String -> SimState
+; Initiates a mission: creates the probe and adds it to the active missions list
+; header: (define (launch-intercept-mission state departure target) SimState)
 (define (launch-intercept-mission state departure target)
   (local [(define bodies (sim-state-bodies state))
           (define from-planet (find-body-by-name bodies departure))
           (define to-planet (find-body-by-name bodies target))
           (define current-idx (sim-state-speed-index state))
           (define speed-mult (second (list-ref SPEED-LEVELS current-idx)))
+          ; Create the probe with calculated physics
           (define new-probe (create-intercepting-probe from-planet to-planet 
                                                        (sim-state-sim-time state)
                                                        speed-mult))
+          ; Wrap it in a Mission struct
           (define new-mission (make-mission departure target "active" new-probe))
+          ; Add to the list of active missions
           (define updated-missions (cons new-mission (sim-state-active-missions state)))]
     (make-sim-state 
      bodies
@@ -496,10 +539,11 @@
      updated-missions
      "none"
      ""
-     (sim-state-sim-time state))))
+     (sim-state-sim-time state)
+     (sim-state-day-counter state))))
 
 ; -----------------------------
-; 4. GENERATORS
+; 5. GENERATORS
 ; -----------------------------
 
 ;; Input/output
@@ -550,8 +594,8 @@
 (define EMPTY-SCENE (generate-stars 200 BLACK-BACKGROUND))  ; Final scene with 200 stars
 
 ; -----------------------------
-; 5. INITIALIZATION
-; -----------------------------
+; 6. INITIALIZATION
+; ----------------------------- 
 
 (define SUN  (make-celestial-body "Sun" 45 0 "yellow" 0 0 '())) 
 (define MERCURY (make-celestial-body "Mercury" 4 (* 1 ORBIT-STEP) "gray" 0 (* 4.17 SPEED-SCALE) '()))
@@ -565,6 +609,7 @@
 
 (define INITIAL-ASTEROIDS (generate-asteroids 400)) 
 (define INITIAL-SOLAR-SYSTEM (list SUN MERCURY VENUS EARTH MARS JUPITER SATURN URANUS NEPTUNE))
+
 ; Note: gallery-index starts at 1
 (define INITIAL-STATE 
   (make-sim-state 
@@ -581,11 +626,11 @@
    "none"                ; mission-mode 
    ""                    ; selected-departure 
    0                     ; sim-time
-   345))                 ;day-counter
+   345))                 ; day-counter
 
 
 ; -----------------------------
-; 6. PHYSICS & UPDATES
+; 7. PHYSICS & UPDATES
 ; -----------------------------
 
 ;; Input/output
@@ -719,13 +764,18 @@
 ;; Input/output
 ; next-world : SimState -> SimState
 ; The main clock tick function. Updates bodies, asteroids, comets, and handles spawning
-; header: (define (next-world current-state) SimState)
+; header: (define (next-world current-state) SimState) 
 (define (next-world current-state)
   (local [
+          ; Number
           (define current-idx (sim-state-speed-index current-state))
+          ; Number
           (define speed-mult (second (list-ref SPEED-LEVELS current-idx)))
+          ; List<CelestialBody>
           (define bodies (sim-state-bodies current-state))
+          ; List<Asteroid>
           (define asteroids (sim-state-asteroid-belt current-state))
+          ; List<Comets>
           (define comets (sim-state-active-comets current-state))
           ; Time update
           (define current-days (sim-state-day-counter current-state))
@@ -733,6 +783,8 @@
           (define missions (sim-state-active-missions current-state))
           (define current-time (sim-state-sim-time current-state))
 
+          ; update-bodies : List<CelestialBody> -> List<CelestialBody>
+          ; Updates position/angle of all bodies based on speed-mult
           (define (update-bodies bodies)
             (cond [(empty? bodies) '()] 
                   [else (cons (next-body-state (first bodies) speed-mult)
@@ -754,11 +806,10 @@
      (sim-state-selected-departure current-state) 
      (+ current-time 1)
      next-days)))                   
-
+ 
 ; -----------------------------
-; 7. DRAWING LOGIC 
+; 8. DRAWING LOGIC 
 ; -----------------------------
-
 
 ;; Input/output
 ; draw-satellites-for-planet : List<Satellite> Number Number Number Image -> Image
@@ -790,7 +841,7 @@
           (define zoomed-orbit-radius (* radius-orbit zoom))
           ; Number (x coordinate relative to camera target)
           (define relative-x (- (location-x loc) (location-x target-loc)))
-          ; Number (y coordinate relative to camera target)
+          ; Number (y coordinate relative to camera target) 
           (define relative-y (- (location-y loc) (location-y target-loc)))
           (define orbit-img (circle (max 1 zoomed-orbit-radius) "outline" (color 255 255 255 50)))
           ; Draw orbit only if looking at Sun
@@ -869,7 +920,7 @@
 ; Draws the HUD, Legend, and Info Panel (Stats, Info, Photos)
 ; header: (define (draw-interface locked-name speed-label tab gal-idx scene) Image)
 
-(define (draw-interface locked-name speed-label tab gal-idx day-count scene)
+(define (draw-interface locked-name speed-label tab gal-idx day-count mission-mode scene)
   (local [; List<String>
           (define info-list (get-planet-info locked-name))
           ; String (extracted data)
@@ -878,7 +929,7 @@
           
           (define stats-color (if (string=? tab "STATS") "cornflowerblue" "gray"))
           (define info-color  (if (string=? tab "INFO")  "cornflowerblue" "gray"))
-          (define phot-color  (if (string=? tab "PHOTOS") "cornflowerblue" "gray"))
+          (define phot-color  (if (string=? tab "PHOTOS") "cornflowerblue" "gray")) 
           
           ; ARROW IMAGES DEFINITION (Used for both drawing and hit-box logic consistency)
           (define ARROW-LEFT (overlay (text "<" 20 "white") (square 30 "solid" "gray")))
@@ -958,7 +1009,26 @@
                                       (text "" 5 "black")
                                       (text "I / D: Speed" 14 "white")
                                       (text "" 5 "black")
-                                      (text "Click: Lock" 14 "white")))]
+                                      (text "Click: Lock" 14 "white")
+                                      (text "" 5 "black")
+                                      (text "M: Mission" 14 "white")
+                                      (text "" 5 "black")
+                                      (text "R: Reset" 14 "white")))
+          ; Top Right Mission Help
+          (define mission-help (above/align "right"
+                                            (text "MISSION" 16 "yellow")
+                                            (text "" 5 "black")
+                                            (text "1. Press 'M'" 14 "white")
+                                            (text "" 5 "black")
+                                            (text "2. Click Start Planet" 14 "white")
+                                            (text "" 5 "black")
+                                            (text "3. Click Target Planet" 14 "white")))
+          
+          ; If mission-mode is NOT "none", draw the scene WITH the help overlay; Otherwise, return the scene as is
+          (define scene-with-help 
+            (if (not (string=? mission-mode "none"))
+                (place-image mission-help (- SCENE-WIDTH 130) 60 scene)
+                scene))] 
     
     ; Place base panel
     (place-image base-panel (+ PANEL-X (/ PANEL-WIDTH 2)) (+ PANEL-Y (/ PANEL-HEIGHT 2))
@@ -966,9 +1036,11 @@
                  (if (string=? tab "PHOTOS")
                      (place-image ARROW-LEFT (+ PANEL-X 60) (+ PANEL-Y 240)
                                   (place-image ARROW-RIGHT (+ PANEL-X 290) (+ PANEL-Y 240)
-                                               (place-image hud 120 50 (place-image legend 120 (- SCENE-HEIGHT 120) scene))))
+                                               (place-image hud 120 70 
+                                                            (place-image legend 120 (- SCENE-HEIGHT 130) scene-with-help))))
                      ; ELSE just HUD
-                     (place-image hud 120 50 (place-image legend 120 (- SCENE-HEIGHT 120) scene))))))
+                     (place-image hud 120 70 
+                                  (place-image legend 120 (- SCENE-HEIGHT 130) scene-with-help))))))
 
 ;; Input/output
 ; draw-world : SimState -> Image
@@ -976,7 +1048,9 @@
 ; header: (define (draw-world current-state) Image)
 (define (draw-world current-state)
   (local [
+          ; List<CelestialBody>
           (define bodies (sim-state-bodies current-state))
+          ; Number
           (define zoom (sim-state-zoom current-state))
           (define mx (sim-state-mouse-x current-state))
           (define my (sim-state-mouse-y current-state))
@@ -984,18 +1058,20 @@
           (define idx (sim-state-speed-index current-state))
           (define tab (sim-state-active-tab current-state))
           (define gal (sim-state-gallery-index current-state))
+          ; List<Asteroids>
           (define asteroids (sim-state-asteroid-belt current-state))
+          ; List<Comets>
           (define comets (sim-state-active-comets current-state))
           (define day-cnt (sim-state-day-counter current-state))
           (define missions (sim-state-active-missions current-state))
           (define mission-mode (sim-state-mission-mode current-state))
           (define selected-dep (sim-state-selected-departure current-state))
           (define speed-label (first (list-ref SPEED-LEVELS idx)))
-          
+          ; CelestialBody (The object the camera follows)
           (define target-body (find-body-by-name bodies locked-name))
+          ; Location (The coordinates of that object)
           (define target-loc (angle-to-location target-body))
           
-         
           (define scene-with-trajectory
             (if (and (string=? mission-mode "selecting-target") (not (string=? selected-dep "")))
                 (local [(define current-idx idx)
@@ -1011,13 +1087,13 @@
                    (draw-asteroids asteroids target-loc zoom 
                      (draw-all-bodies bodies target-loc locked-name zoom mx my EMPTY-SCENE)))))
           
-          
+          ; Image (The rendered universe without UI)
           (define space-scene (draw-all-active-probes missions target-loc zoom scene-with-trajectory))]
     
-    (draw-interface locked-name speed-label tab gal day-cnt space-scene)))
+    (draw-interface locked-name speed-label tab gal day-cnt mission-mode space-scene)))
 
 ; -----------------------------
-; 8. INPUT HANDLERS
+; 9. INPUT HANDLERS
 ; -----------------------------
 
 ;; Input/output
@@ -1027,7 +1103,9 @@
 
 (define (handle-key current-state key)
   (local [
+          ; Number
           (define current-zoom (sim-state-zoom current-state))
+          ; List<CelestialBody>
           (define bodies (sim-state-bodies current-state))
           (define mx (sim-state-mouse-x current-state))
           (define my (sim-state-mouse-y current-state))
@@ -1035,28 +1113,27 @@
           (define idx (sim-state-speed-index current-state))
           (define tab (sim-state-active-tab current-state))
           (define gal (sim-state-gallery-index current-state))
+          ; List<Asteroids>
           (define asteroids (sim-state-asteroid-belt current-state))
+          ; List<Comets>
           (define comets (sim-state-active-comets current-state))
           (define missions (sim-state-active-missions current-state))
           (define mission-mode (sim-state-mission-mode current-state))
           (define selected-dep (sim-state-selected-departure current-state))
           (define sim-time (sim-state-sim-time current-state))
+          (define days (sim-state-day-counter current-state))
           (define max-idx (- (length SPEED-LEVELS) 1))]
     
     (cond
-      [(or (key=? key "up") (key=? key "="))
-       (make-sim-state bodies (+ current-zoom 0.1) mx my locked idx tab gal 
-                      asteroids comets missions mission-mode selected-dep sim-time)]
-      [(or (key=? key "down") (key=? key "-"))
-       (make-sim-state bodies (max 0.1 (- current-zoom 0.1)) mx my locked idx tab gal 
-                      asteroids comets missions mission-mode selected-dep sim-time)] 
-      [(key=? key "i")
-       (make-sim-state bodies current-zoom mx my locked (min max-idx (+ idx 1)) tab gal 
-                      asteroids comets missions mission-mode selected-dep sim-time)]
-      [(key=? key "d")
-       (make-sim-state bodies current-zoom mx my locked (max 0 (- idx 1)) tab gal 
-                      asteroids comets missions mission-mode selected-dep sim-time)]
-       [(key=? key "r") INITIAL-STATE] ; Full reset for year and day
+      [(or (key=? key "up") (key=? key "="))             ; Zoom IN 
+       (make-sim-state bodies (+ current-zoom 0.1) mx my locked idx tab gal asteroids comets missions mission-mode selected-dep sim-time days)]
+      [(or (key=? key "down") (key=? key "-"))           ; Zoom OUT 
+       (make-sim-state bodies (max 0.1 (- current-zoom 0.1)) mx my locked idx tab gal asteroids comets missions mission-mode selected-dep sim-time days)] 
+      [(key=? key "i")                                   ; Increase speed
+       (make-sim-state bodies current-zoom mx my locked (min max-idx (+ idx 1)) tab gal asteroids comets missions mission-mode selected-dep sim-time days)]
+      [(key=? key "d")                                   ; Decrease speed
+       (make-sim-state bodies current-zoom mx my locked (max 0 (- idx 1)) tab gal asteroids comets missions mission-mode selected-dep sim-time days)]
+       [(key=? key "r") INITIAL-STATE]                   ; Full reset for year and day
       
       [(key=? key "m")
        (if (string=? mission-mode "none")
@@ -1064,37 +1141,39 @@
                           asteroids comets missions 
                           "selecting-departure"
                           "" 
-                          sim-time)
+                          sim-time
+                          days)
            (make-sim-state bodies current-zoom mx my locked idx tab gal 
                           asteroids comets missions 
                           "none" 
                           "" 
-                          sim-time))]
+                          sim-time
+                          days))]
       
       [else current-state])))
-
-
 
 ;; Input/output
 ; handle-mouse : SimState Number Number MouseEvent -> SimState
 ; Updates mouse position and handles clicks on UI buttons or planets
 ; header: (define (handle-mouse current-state x y event) SimState)
 (define (handle-mouse current-state x y event)
-  (local [
+  (local [; List<CelestialBody>
           (define bodies (sim-state-bodies current-state))
           (define zoom (sim-state-zoom current-state))
           (define locked-name (sim-state-locked-body-name current-state))
           (define idx (sim-state-speed-index current-state))
           (define tab (sim-state-active-tab current-state))
           (define gal (sim-state-gallery-index current-state))
+          ; List<Asteroids>
           (define asteroids (sim-state-asteroid-belt current-state))
+          ; List<Comets>
           (define comets (sim-state-active-comets current-state))
           (define missions (sim-state-active-missions current-state))
           (define mission-mode (sim-state-mission-mode current-state))
           (define selected-dep (sim-state-selected-departure current-state))
           (define sim-time (sim-state-sim-time current-state))
           (define day-counter (sim-state-day-counter current-state))
-          
+          ; Boolean (Hit detection for UI elements)
           (define click-in-panel? (and (> x PANEL-X) (< x (+ PANEL-X PANEL-WIDTH)) 
                                       (> y PANEL-Y) (< y (+ PANEL-Y PANEL-HEIGHT))))
           (define click-stats-btn? (and (> x PANEL-X) (< x (+ PANEL-X BUTTON-WIDTH)) 
@@ -1105,20 +1184,20 @@
           (define click-photo-btn? (and (> x (+ PANEL-X (* 2 BUTTON-WIDTH))) 
                                        (< x (+ PANEL-X PANEL-WIDTH)) 
                                        (> y PANEL-Y) (< y (+ PANEL-Y BUTTON-HEIGHT))))
-          
+          ; Arrow Click Logic
           (define click-left-arrow? (and (string=? tab "PHOTOS") 
                                         (> x (+ PANEL-X 45)) (< x (+ PANEL-X 75)) 
                                         (> y (+ PANEL-Y 225)) (< y (+ PANEL-Y 255))))
           (define click-right-arrow? (and (string=? tab "PHOTOS") 
                                          (> x (+ PANEL-X 275)) (< x (+ PANEL-X 305)) 
                                          (> y (+ PANEL-Y 225)) (< y (+ PANEL-Y 255))))
-          
+          ; get-clicked-planet-name : List<CelestialBody> -> String 
+          ; Checks if the mouse click coordinates (x,y) are near a planet
           (define (get-clicked-planet-name bodies)
             (cond [(empty? bodies) locked-name] 
               [else (local [
                        (define body (first bodies))
-                       (define target-body (find-body-by-name (sim-state-bodies current-state) 
-                                                              locked-name))
+                       (define target-body (find-body-by-name (sim-state-bodies current-state) locked-name))
                        (define target-loc (angle-to-location target-body))
                        (define body-loc (angle-to-location body))
                        (define draw-x (+ CENTER-X (* (- (location-x body-loc) 
@@ -1126,30 +1205,24 @@
                        (define draw-y (+ CENTER-Y (* (- (location-y body-loc) 
                                                        (location-y target-loc)) zoom)))
                        (define distance (sqrt (+ (sqr (- x draw-x)) (sqr (- y draw-y)))))]
-                      (if (< distance 30) 
-                          (celestial-body-name body) 
-                          (get-clicked-planet-name (rest bodies))))]))]
+                      (if (< distance 30) (celestial-body-name body) (get-clicked-planet-name (rest bodies))))]))]
     
     (cond
       [(mouse=? event "button-down")
        (cond
-         [click-stats-btn? (make-sim-state bodies zoom x y locked-name idx "STATS" gal 
-                                          asteroids comets missions mission-mode selected-dep sim-time)]
-         [click-info-btn?  (make-sim-state bodies zoom x y locked-name idx "INFO" gal 
-                                          asteroids comets missions mission-mode selected-dep sim-time)]
-         [click-photo-btn? (make-sim-state bodies zoom x y locked-name idx "PHOTOS" gal 
-                                          asteroids comets missions mission-mode selected-dep sim-time)]
+         [click-stats-btn? (make-sim-state bodies zoom x y locked-name idx "STATS" gal asteroids comets missions mission-mode selected-dep sim-time day-counter)]
+         [click-info-btn?  (make-sim-state bodies zoom x y locked-name idx "INFO" gal asteroids comets missions mission-mode selected-dep sim-time day-counter)]
+         [click-photo-btn? (make-sim-state bodies zoom x y locked-name idx "PHOTOS" gal asteroids comets missions mission-mode selected-dep sim-time day-counter)]
          
          [click-left-arrow? (make-sim-state bodies zoom x y locked-name idx tab 
                                            (if (= gal 1) 3 (- gal 1)) 
-                                           asteroids comets missions mission-mode selected-dep sim-time)]
+                                           asteroids comets missions mission-mode selected-dep sim-time day-counter)]
          [click-right-arrow? (make-sim-state bodies zoom x y locked-name idx tab 
                                             (if (= gal 3) 1 (+ gal 1)) 
-                                            asteroids comets missions mission-mode selected-dep sim-time)]
-         
+                                            asteroids comets missions mission-mode selected-dep sim-time day-counter)]
          [click-in-panel? current-state]
          
-         
+         ; Mission Logic
          [(string=? mission-mode "selecting-departure")
           (local [(define clicked-planet (get-clicked-planet-name bodies))]
             (if (string=? clicked-planet "Sun")
@@ -1158,7 +1231,8 @@
                                asteroids comets missions 
                                "selecting-target" 
                                clicked-planet      
-                               sim-time)))]
+                               sim-time
+                               day-counter)))] 
          
          [(string=? mission-mode "selecting-target")
           (local [(define clicked-planet (get-clicked-planet-name bodies))]
@@ -1166,14 +1240,10 @@
                     (string=? clicked-planet selected-dep))
                 current-state  
                 (launch-intercept-mission current-state selected-dep clicked-planet)))]
-         
-         
-         [else (make-sim-state bodies zoom x y (get-clicked-planet-name bodies) idx tab 1 
-                              asteroids comets missions mission-mode selected-dep sim-time)])]
+         ; Reset Gallery Index to 1 when switching planets
+         [else (make-sim-state bodies zoom x y (get-clicked-planet-name bodies) idx tab 1 asteroids comets missions mission-mode selected-dep sim-time day-counter)])]
       
-      
-      [else (make-sim-state bodies zoom x y locked-name idx tab gal 
-                           asteroids comets missions mission-mode selected-dep sim-time day-counter)])))
+      [else (make-sim-state bodies zoom x y locked-name idx tab gal asteroids comets missions mission-mode selected-dep sim-time day-counter)])))
 
 ; main : SimState -> SimState
 ; run the solar-system animation starting from the given world
