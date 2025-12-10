@@ -1,6 +1,7 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname solar) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname solarnew4) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+
 ; Solar System Simulator
 
 (require 2htdp/image)
@@ -247,20 +248,74 @@
 
 (define (get-planet-info name)
   (cond
-    [(string=? name "Sun")     (list "1.989 x 10^30 kg" "1.39 million km" "5,500 C" "The star at the center" "of our Solar System." "It provides light and energy.")]
-    [(string=? name "Mercury") (list "3.285 x 10^23 kg" "4,879 km" "167 C" "The smallest planet." "It has no atmosphere" "to retain heat.")]
-    [(string=? name "Venus")   (list "4.867 x 10^24 kg" "12,104 km" "464 C" "The hottest planet due" "to a thick toxic atmosphere" "trapping heat.")]
-    [(string=? name "Earth")   (list "5.972 x 10^24 kg" "12,742 km" "15 C" "Our home planet." "The only known planet" "to support life.")]
-    [(string=? name "Mars")    (list "6.39 x 10^23 kg"  "6,779 km" "-65 C" "The Red Planet." "Dusty, cold, with a" "very thin atmosphere.")]
-    [(string=? name "Jupiter") (list "1.898 x 10^27 kg" "139,820 km" "-110 C" "Gas giant. The largest" "planet with the famous" "Great Red Spot storm.")]
-    [(string=? name "Saturn")  (list "5.683 x 10^26 kg" "116,460 km" "-140 C" "Gas giant famous for" "its complex ring system" "made of ice and rock.")]
-    [(string=? name "Uranus")  (list "8.681 x 10^25 kg" "50,724 km" "-195 C" "Ice giant." "It rotates on its side" "unlike other planets.")]
-    [(string=? name "Neptune") (list "1.024 x 10^26 kg" "49,244 km" "-200 C" "The windiest planet." "Dark, cold, and with" "supersonic winds.")]
-    [else (list "?" "?" "?" "No Data" "Available" ".")]))
+    [(string=? name "Sun")     (list "1.989 x 10^30 kg" "1.39 million km" "5,500 C" 
+                                     "Gravity anchor holding 99% of system mass." 
+                                     "A fusion reactor burning hydrogen to helium." 
+                                     "Surface is a plasma ocean with magnetic fields." 
+                                     "Emits solar wind shaping the whole heliosphere." 
+                                     "A main-sequence star, future Red Giant.")]
+    
+    [(string=? name "Mercury") (list "3.285 x 10^23 kg" "4,879 km" "167 C" 
+                                     "Smallest planet with a huge iron core." 
+                                     "Surface scarred by ancient asteroid impacts." 
+                                     "No atmosphere, leading to extreme heat/cold." 
+                                     "Rotates exactly three times per two orbits." 
+                                     "Deep polar craters hide permanent water ice.")]
+    
+    [(string=? name "Venus")   (list "4.867 x 10^24 kg" "12,104 km" "464 C" 
+                                     "Earth-sized but a toxic, hellish landscape." 
+                                     "Pressure is 90x Earth's, crushing metal." 
+                                     "Thick sulfuric acid clouds trap intense heat." 
+                                     "Rotates backward; Sun rises in the west." 
+                                     "Has thousands of volcanoes and highlands.")]
+    
+    [(string=? name "Earth")   (list "5.972 x 10^24 kg" "12,742 km" "15 C" 
+                                     "Only known world with complex biological life." 
+                                     "Atmosphere and magnetic field shield us." 
+                                     "Tectonics recycle carbon and shape land." 
+                                     "Large moon stabilizes our axial tilt." 
+                                     "In the Goldilocks zone: liquid water exists.")]
+    
+    [(string=? name "Mars")    (list "6.39 x 10^23 kg"  "6,779 km" "-65 C" 
+                                     "Cold desert covered in rusty iron dust." 
+                                     "Home to Olympus Mons, the largest volcano." 
+                                     "Thin CO2 atmosphere offers poor shielding." 
+                                     "Riverbeds suggest water once flowed freely." 
+                                     "Two small potato-shaped moons orbit it.")]
+    
+    [(string=? name "Jupiter") (list "1.898 x 10^27 kg" "139,820 km" "-110 C" 
+                                     "Massive gas giant, heavier than all others." 
+                                     "Great Red Spot is a storm bigger than Earth." 
+                                     "Deep hydrogen ocean becomes metallic liquid." 
+                                     "Gravity acts as a shield against comets." 
+                                     "Has many moons, including icy Europa.")]
+    
+    [(string=? name "Saturn")  (list "5.683 x 10^26 kg" "116,460 km" "-140 C" 
+                                     "Famous for complex rings of ice and rock." 
+                                     "Least dense planet; would float in water." 
+                                     "Hexagonal storm persists at the north pole." 
+                                     "Radiates more heat than it gets from Sun." 
+                                     "Titan, its moon, has liquid methane lakes.")]
+    
+    [(string=? name "Uranus")  (list "8.681 x 10^25 kg" "50,724 km" "-195 C" 
+                                     "Ice giant rich in methane, appearing blue." 
+                                     "Rotates on its side with a 98-degree tilt." 
+                                     "Poles face the Sun for decades at a time." 
+                                     "Coldest atmosphere, dropping to -224 C." 
+                                     "Magnetic field is tilted and off-center.")]
+    
+    [(string=? name "Neptune") (list "1.024 x 10^26 kg" "49,244 km" "-200 C" 
+                                     "Distant, dark world with supersonic winds." 
+                                     "Predicted by math before being seen." 
+                                     "Great Dark Spot storm appears and vanishes." 
+                                     "Moon Triton has nitrogen ice geysers." 
+                                     "Internal heat drives wild weather patterns.")]
+    
+    [else (list "?" "?" "?" "No Data" "Available" "For This" "Selection" ".")]))
 
 ; Tests
 (check-expect (first (get-planet-info "Earth")) "5.972 x 10^24 kg")
-(check-expect (get-planet-info "Pluto") (list "?" "?" "?" "No Data" "Available" "."))
+(check-expect (get-planet-info "Pluto") (list "?" "?" "?" "No Data" "Available" "For This" "Selection" "."))
 (check-expect (third (get-planet-info "Mars")) "-65 C")
 
 ;; Input/output
@@ -990,8 +1045,14 @@
   (local [; List<String>
           (define info-list (get-planet-info locked-name))
           ; String (extracted data)
-          (define mass (first info-list)) (define diam (second info-list)) (define temp (third info-list))
-          (define desc1 (fourth info-list)) (define desc2 (fifth info-list)) (define desc3 (sixth info-list))
+          (define mass (first info-list)) 
+          (define diam (second info-list)) 
+          (define temp (third info-list))
+          (define desc1 (fourth info-list)) 
+          (define desc2 (fifth info-list)) 
+          (define desc3 (sixth info-list))
+          (define desc4 (seventh info-list))
+          (define desc5 (eighth info-list))
           
           (define stats-color (if (string=? tab "STATS") "cornflowerblue" "gray"))
           (define info-color  (if (string=? tab "INFO")  "cornflowerblue" "gray"))
@@ -1025,7 +1086,11 @@
                             (text " " 4 "transparent")
                             (text desc2 14 "white")
                             (text " " 4 "transparent")
-                            (text desc3 14 "white"))]
+                            (text desc3 14 "white")
+                            (text " " 4 "transparent")
+                            (text desc4 14 "white") 
+                            (text " " 4 "transparent")
+                            (text desc5 14 "white"))]
               [(string=? tab "PHOTOS")
                (local [
                        (define current-photo (get-gallery-image locked-name gal-idx))
