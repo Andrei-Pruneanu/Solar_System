@@ -1276,10 +1276,11 @@
     (cond
       [(mouse=? event "button-down")
        (cond
+         ; Check if the mouse is inside a tab button.
          [click-stats-btn? (make-sim-state bodies zoom x y locked-name idx "STATS" gal asteroids comets missions mission-mode selected-dep sim-time day-counter)]
          [click-info-btn?  (make-sim-state bodies zoom x y locked-name idx "INFO" gal asteroids comets missions mission-mode selected-dep sim-time day-counter)]
          [click-photo-btn? (make-sim-state bodies zoom x y locked-name idx "PHOTOS" gal asteroids comets missions mission-mode selected-dep sim-time day-counter)]
-         
+         ; Handle Previous/Next arrows only if the PHOTOS tab is active.
          [click-left-arrow? (make-sim-state bodies zoom x y locked-name idx tab 
                                            (if (= gal 1) 3 (- gal 1)) 
                                            asteroids comets missions mission-mode selected-dep sim-time day-counter)]
@@ -1295,8 +1296,8 @@
                 current-state  
                 (make-sim-state bodies zoom x y clicked-planet idx tab 1 
                                asteroids comets missions 
-                               "selecting-target" 
-                               clicked-planet      
+                               "selecting-target"     ; Advance to next step
+                               clicked-planet         ; Save departure planet
                                sim-time
                                day-counter)))] 
          
@@ -1304,7 +1305,8 @@
           (local [(define clicked-planet (get-clicked-planet-name bodies))]
             (if (or (string=? clicked-planet "Sun") 
                     (string=? clicked-planet selected-dep))
-                current-state  
+                current-state
+                ; Launch the probe if a valid target is clicked
                 (launch-intercept-mission current-state selected-dep clicked-planet)))]
          ; Reset Gallery Index to 1 when switching planets
          [else (make-sim-state bodies zoom x y (get-clicked-planet-name bodies) idx tab 1 asteroids comets missions mission-mode selected-dep sim-time day-counter)])]
