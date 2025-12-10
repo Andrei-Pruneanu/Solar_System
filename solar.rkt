@@ -296,6 +296,7 @@
 ; predict-planet-position : CelestialBody Number -> Location
 ; Predicts the (x, y) location of a planet after a given number of ticks
 ; header: (define (predict-planet-position planet ticks) Location)
+
 (define (predict-planet-position planet ticks)
   (local [; Calculate the new angle based on angular speed * time
           (define future-angle (+ (celestial-body-angle planet)
@@ -314,6 +315,7 @@
 ; Calculates the velocity vector (vx, vy) and travel time to intercept a moving target
 ; Returns: (list vx vy travel-time)
 ; header: (define (calculate-intercept-trajectory from-planet to-planet speed-mult) (list Number Number Number))
+
 (define (calculate-intercept-trajectory from-planet to-planet speed-mult)
   (local [(define from-loc (angle-to-location from-planet))
           (define to-angle (celestial-body-angle to-planet))
@@ -367,6 +369,7 @@
 ; create-intercepting-probe : CelestialBody CelestialBody Number Number -> Probe
 ; Creates a new Probe struct initialized with position and velocity to intercept the target
 ; header: (define (create-intercepting-probe from-planet to-planet current-time speed-mult) Probe)
+
 (define (create-intercepting-probe from-planet to-planet current-time speed-mult)
   (local [(define start-loc (angle-to-location from-planet))
           ; Get the calculated velocity and time
@@ -392,6 +395,7 @@
 ; Template:
 ; (define (update-probe-smart p mult bodies)
 ;   (if (active? p) (make-probe ...) p))
+
 (define (update-probe-smart p speed-mult bodies)
   (if (or (string=? (probe-status p) "in-transit")
           (string=? (probe-status p) "launching"))
@@ -424,6 +428,7 @@
 ; check-arrival-dynamic : Probe List<CelestialBody> -> Probe
 ; Checks if a probe is close enough to its target planet to be considered "arrived"
 ; header: (define (check-arrival-dynamic p bodies) Probe)
+
 (define (check-arrival-dynamic p bodies)
   (if (or (string=? (probe-status p) "in-transit")
           (string=? (probe-status p) "launching"))
@@ -465,10 +470,11 @@
 ; update-missions-smart : List<Mission> List<CelestialBody> Number -> List<Mission>
 ; Updates the state of all active missions, moving probes and checking for arrival
 ; header: (define (update-missions-smart missions bodies speed-mult) List<Mission>)
-; Template: (Standard recursive list processing)
-; (define (update-missions-smart l ...)
-;   (cond [(empty? l) ...]
-;         [else (... (first l) ... (update-missions-smart (rest l) ...))]))
+; Template:
+; (define (update-missions-smart missions bodies speed-mult)
+;   (cond [(empty? missions) '()]
+;         [else (... (first missions) ... (update-missions-smart (rest missions) bodies speed-mult))]))
+
 (define (update-missions-smart missions bodies speed-mult)
   (cond [(empty? missions) '()]
         [else (local [(define m (first missions))
@@ -493,6 +499,7 @@
 ; draw-intercept-trajectory : CelestialBody CelestialBody Location Number Number Image -> Image
 ; Draws a dashed line representing the calculated future path of the probe
 ; header: (define (draw-intercept-trajectory from-planet to-planet target-loc zoom speed-mult scene) Image)
+
 (define (draw-intercept-trajectory from-planet to-planet target-loc zoom speed-mult scene)
   (local [(define trajectory (calculate-intercept-trajectory from-planet to-planet speed-mult))
           (define travel-time (third trajectory))
@@ -510,6 +517,7 @@
 ; draw-probe-with-trail : Probe Location Number Image -> Image
 ; Draws a probe as a rotated triangle with a fading trail behind it
 ; header: (define (draw-probe-with-trail p target-loc zoom scene) Image)
+
 (define (draw-probe-with-trail p target-loc zoom scene)
   (local [(define draw-x (+ CENTER-X (* (- (probe-x p) (location-x target-loc)) zoom)))
           (define draw-y (+ CENTER-Y (* (- (probe-y p) (location-y target-loc)) zoom)))
@@ -534,6 +542,7 @@
 ; draw-all-active-probes : List<Mission> Location Number Image -> Image
 ; Recursively draws all probes currently in "launching" or "in-transit" status
 ; header: (define (draw-all-active-probes missions target-loc zoom scene) Image)
+
 (define (draw-all-active-probes missions target-loc zoom scene)
   (cond [(empty? missions) scene]
         [else (local [(define m (first missions))
@@ -549,6 +558,7 @@
 ; launch-intercept-mission : SimState String String -> SimState
 ; Initiates a mission: creates the probe and adds it to the active missions list
 ; header: (define (launch-intercept-mission state departure target) SimState)
+
 (define (launch-intercept-mission state departure target)
   (local [(define bodies (sim-state-bodies state))
           (define from-planet (find-body-by-name bodies departure))
@@ -693,6 +703,11 @@
 ; update-satellites : List<Satellite> Number -> List<Satellite>
 ; Updates a list of satellites
 ; header: (define (update-satellites moons speed-mult) List<Satellite>)
+; Template:
+; (define (update-satellites moons speed-mult)
+;   (cond [(empty? moons) '()]
+;         [else (... (first moons) ...
+;                    (update-satellites (rest moons) speed-mult))]))
 
 (define (update-satellites moons speed-mult)
   (cond [(empty? moons) '()] 
@@ -737,6 +752,11 @@
 ; update-asteroids : List<Asteroid> Number -> List<Asteroid>
 ; Updates list of asteroids.
 ; header: (define (update-asteroids asteroids speed-mult) List<Asteroid>)
+; Template:
+; (define (update-asteroids asteroids speed-mult)
+;   (cond [(empty? asteroids) '()]
+;         [else (... (first asteroids) ...
+;                    (update-asteroids (rest asteroids) speed-mult))]))
 
 (define (update-asteroids asteroids speed-mult)
   (cond [(empty? asteroids) '()] 
@@ -781,8 +801,6 @@
 (define C-BAD (make-comet -300 500 0 0 5))
 (check-expect (filter-comets (list C-GOOD)) (list C-GOOD))
 (check-expect (filter-comets (list C-GOOD C-BAD)) (list C-GOOD))
-
-
 
 ;; Input/output
 ; maybe-spawn-comet : List<Comet> -> List<Comet>
@@ -918,6 +936,11 @@
 ; draw-all-bodies : List<CelestialBody> Location String Number Number Number Image -> Image
 ; Recursively draws all planets in the list
 ; header: (define (draw-all-bodies bodies target-loc locked-name zoom mx my scene) Image)
+; Template:
+; (define (draw-all-bodies bodies target-loc locked-name zoom mx my scene)
+;   (cond [(empty? bodies) scene]
+;         [else (draw-all-bodies (rest bodies) ...
+;                                (draw-celestial-body (first bodies) ... scene))]))
 
 (define (draw-all-bodies bodies target-loc locked-name zoom mx my scene)
   (cond [(empty? bodies) scene] 
